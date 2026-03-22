@@ -67,6 +67,15 @@
 
 ## 本地开发
 
+### 第零步：获取源码
+
+首次在新机器启动时，先克隆仓库并进入项目目录：
+
+```bash
+git clone https://github.com/sum2yang/novel-tool.git
+cd novel-tool
+```
+
 ### 方式一：Node.js
 
 1. 安装依赖
