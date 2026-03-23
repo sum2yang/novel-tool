@@ -176,6 +176,17 @@ docker compose --env-file .env.docker up --build
 docker compose --env-file .env.docker down
 ```
 
+低配置机器说明：
+
+- 如果你的机器只有 `2C2G`，不要在服务器上执行 `docker compose up --build`
+- 这种规格本地构建镜像很容易因为 Node/Next build、Prisma 和多容器同时抢内存而表现为“卡死”或被系统杀掉
+- 生产环境应优先使用 GitHub Actions 构建好的 GHCR 镜像，再在服务器执行 `docker compose pull && docker compose up -d --no-build`
+- 当前默认已经加了更保守的低内存参数：
+  - `NODE_OPTIONS=--max-old-space-size=768`
+  - `MALLOC_ARENA_MAX=2`
+  - PostgreSQL 使用较保守的 shared buffers / work mem / max connections
+- 如果你仍然把 `postgres + minio + app` 全部放在同一台 `2C2G` 机器上，建议额外开启 swap，或者把对象存储/数据库外置
+
 ## 常用脚本
 
 ### 基础开发

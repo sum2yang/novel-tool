@@ -3,6 +3,13 @@ services:
     image: postgres:16-bookworm
     container_name: novel-tools-postgres
     restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}
+      -c effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-512MB}
+      -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
+      -c work_mem=${POSTGRES_WORK_MEM:-4MB}
+      -c max_connections=${POSTGRES_MAX_CONNECTIONS:-40}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-novel_tools}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -47,6 +54,8 @@ services:
       NODE_ENV: production
       APP_ENV: production
       PORT: 3000
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=768}
+      MALLOC_ARENA_MAX: ${MALLOC_ARENA_MAX:-2}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/novel_tools?schema=public}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-please-change-me-to-a-random-32-byte-secret}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
