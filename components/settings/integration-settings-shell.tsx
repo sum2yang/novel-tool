@@ -318,7 +318,9 @@ export function IntegrationSettingsShell({
             <Input name="secret" type="password" placeholder="认证密钥，authMode=none 时可留空" />
             <Textarea name="extraHeaders" placeholder='额外请求头，JSON 格式，例如 {"x-foo":"bar"}' />
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-[var(--muted-ink)]">保存后可对单个模型接口执行健康检查。</p>
+              <p className="text-xs text-[var(--muted-ink)]">
+                健康检查只会对默认模型发起一次最小探活，不等于大上下文生成一定成功。
+              </p>
               <Button type="submit" size="sm" disabled={isPending}>
                 {isPending ? "保存中" : "保存接口"}
               </Button>
@@ -344,25 +346,54 @@ export function IntegrationSettingsShell({
                     <p className="mt-1 text-xs text-[var(--muted-ink)]">鉴权方式：{getAuthModeLabel(endpoint.authMode)}</p>
                     <p className="mt-1 truncate text-xs text-[var(--muted-ink)]">{endpoint.baseURL}</p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={isPending}
-                    onClick={() =>
-                      runRefresh(async () => {
-                        const response = await fetch(`/api/provider-endpoints/${endpoint.id}/health`, {
-                          method: "POST",
-                        });
-                        if (!response.ok) {
-                          throw new Error(await readErrorMessage(response));
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={isPending}
+                      onClick={() =>
+                        runRefresh(async () => {
+                          const response = await fetch(`/api/provider-endpoints/${endpoint.id}/health`, {
+                            method: "POST",
+                          });
+                          if (!response.ok) {
+                            throw new Error(await readErrorMessage(response));
+                          }
+                          setHealthMessage(`已检查模型接口 ${endpoint.label}。`);
+                        })
+                      }
+                    >
+                      健康检查
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={isPending}
+                      onClick={() => {
+                        const confirmed = window.confirm(
+                          `确定删除模型接口“${endpoint.label}”吗？\n\n如果它已经被历史生成记录引用，系统会阻止删除。`,
+                        );
+
+                        if (!confirmed) {
+                          return;
                         }
-                        setHealthMessage(`已检查模型接口 ${endpoint.label}。`);
-                      })
-                    }
-                  >
-                    健康检查
-                  </Button>
+
+                        runRefresh(async () => {
+                          const response = await fetch(`/api/provider-endpoints/${endpoint.id}`, {
+                            method: "DELETE",
+                          });
+                          if (!response.ok) {
+                            throw new Error(await readErrorMessage(response));
+                          }
+                          setEndpointMessage(`已删除模型接口 ${endpoint.label}。`);
+                        });
+                      }}
+                    >
+                      删除
+                    </Button>
+                  </div>
                 </div>
                 <p className="mt-3 text-xs text-[var(--muted-ink)]">
                   状态：{getHealthStatusLabel(endpoint.healthStatus)} · 最近检查：{formatTime(endpoint.lastHealthCheckAt)}
@@ -437,25 +468,54 @@ export function IntegrationSettingsShell({
                     <p className="mt-1 text-xs text-[var(--muted-ink)]">鉴权方式：{getAuthModeLabel(server.authMode)}</p>
                     <p className="mt-1 truncate text-xs text-[var(--muted-ink)]">{server.serverUrl}</p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={isPending}
-                    onClick={() =>
-                      runRefresh(async () => {
-                        const response = await fetch(`/api/mcp-servers/${server.id}/health`, {
-                          method: "POST",
-                        });
-                        if (!response.ok) {
-                          throw new Error(await readErrorMessage(response));
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={isPending}
+                      onClick={() =>
+                        runRefresh(async () => {
+                          const response = await fetch(`/api/mcp-servers/${server.id}/health`, {
+                            method: "POST",
+                          });
+                          if (!response.ok) {
+                            throw new Error(await readErrorMessage(response));
+                          }
+                          setHealthMessage(`已检查 MCP 服务 ${server.name}。`);
+                        })
+                      }
+                    >
+                      健康检查
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={isPending}
+                      onClick={() => {
+                        const confirmed = window.confirm(
+                          `确定删除 MCP 服务“${server.name}”吗？\n\n删除后，该服务将不再出现在任务选择与能力浏览中。`,
+                        );
+
+                        if (!confirmed) {
+                          return;
                         }
-                        setHealthMessage(`已检查 MCP 服务 ${server.name}。`);
-                      })
-                    }
-                  >
-                    健康检查
-                  </Button>
+
+                        runRefresh(async () => {
+                          const response = await fetch(`/api/mcp-servers/${server.id}`, {
+                            method: "DELETE",
+                          });
+                          if (!response.ok) {
+                            throw new Error(await readErrorMessage(response));
+                          }
+                          setMcpMessage(`已删除 MCP 服务 ${server.name}。`);
+                        });
+                      }}
+                    >
+                      删除
+                    </Button>
+                  </div>
                 </div>
                 <p className="mt-3 text-xs text-[var(--muted-ink)]">
                   状态：{getHealthStatusLabel(server.healthStatus)} · 最近同步：{formatTime(server.lastSyncAt)}

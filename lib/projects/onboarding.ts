@@ -51,6 +51,14 @@ export type OnboardingRecommendedOption = {
   value: string;
 };
 
+export type OnboardingQuestionSpec = {
+  key: OnboardingQuestionKey;
+  title: string;
+  prompt: string;
+  placeholder: string;
+  optional: boolean;
+};
+
 export type OnboardingSeedInput = {
   name?: string | null;
   genre?: string | null;
@@ -65,6 +73,21 @@ export type OnboardingAnswerEntry = {
   answer: string;
   skipped: boolean;
   updatedAt: string;
+};
+
+export type OnboardingMode = "fallback" | "ai_dynamic";
+
+export type OnboardingRuntimeConfig = {
+  endpointId: string | null;
+  endpointLabel: string | null;
+  modelId: string | null;
+  providerType: string | null;
+};
+
+export type DynamicOnboardingQuestion = OnboardingQuestionSpec & {
+  recommendedOptions: OnboardingRecommendedOption[];
+  askedAt: string;
+  source: "ai";
 };
 
 export type OnboardingSummary = {
@@ -95,11 +118,18 @@ export type OnboardingSummary = {
     totalQuestions: number;
     isReadyToFinalize: boolean;
   };
+  mode: OnboardingMode;
+  runtime: OnboardingRuntimeConfig | null;
+  dynamic: {
+    isAiDriven: boolean;
+    history: DynamicOnboardingQuestion[];
+  };
 };
 
-export type OnboardingQuestionPayload = OnboardingQuestion & {
+export type OnboardingQuestionPayload = OnboardingQuestionSpec & {
   answer: string;
   recommendedOptions: OnboardingRecommendedOption[];
+  source: "fallback" | "ai";
 };
 
 export type OnboardingSessionPayload = {
@@ -110,6 +140,8 @@ export type OnboardingSessionPayload = {
   currentQuestion: OnboardingQuestionPayload | null;
   answers: OnboardingAnswerEntry[];
   summary: OnboardingSummary;
+  mode: OnboardingMode;
+  runtime: OnboardingRuntimeConfig | null;
   finalizedProjectId: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -121,6 +153,12 @@ type BootstrapPackageInput = {
   genre: string;
   platform: string;
   summary: OnboardingSummary;
+};
+
+type BuildOnboardingSummaryOptions = {
+  mode?: OnboardingMode;
+  runtime?: OnboardingRuntimeConfig | null;
+  dynamicHistory?: DynamicOnboardingQuestion[];
 };
 
 type ExtraArtifactDefinition = {
@@ -172,6 +210,25 @@ function cleanSeedField(value: string | null | undefined) {
   return text || null;
 }
 
+function normalizeOnboardingMode(value: unknown): OnboardingMode {
+  return value === "ai_dynamic" ? "ai_dynamic" : "fallback";
+}
+
+function normalizeOnboardingRuntimeConfig(value: unknown): OnboardingRuntimeConfig | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    endpointId: typeof value.endpointId === "string" && value.endpointId.trim() ? value.endpointId.trim() : null,
+    endpointLabel:
+      typeof value.endpointLabel === "string" && value.endpointLabel.trim() ? value.endpointLabel.trim() : null,
+    modelId: typeof value.modelId === "string" && value.modelId.trim() ? value.modelId.trim() : null,
+    providerType:
+      typeof value.providerType === "string" && value.providerType.trim() ? value.providerType.trim() : null,
+  };
+}
+
 function readAnswer(answers: OnboardingAnswerEntry[], key: OnboardingQuestionKey) {
   return answers.find((entry) => entry.questionKey === key)?.answer ?? "";
 }
@@ -214,6 +271,95 @@ function renderBulletList(items: string[]) {
 
 function renderNameLead(nameHint: string | null) {
   return nameHint ? `暂定名《${nameHint.replace(/[《》]/g, "").trim()}》` : "项目暂定名待定";
+}
+
+function normalizeRecommendedOptions(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] satisfies OnboardingRecommendedOption[];
+  }
+
+  return dedupeRecommendedOptions(
+    value.flatMap((row) => {
+      if (!isRecord(row)) {
+        return [];
+      }
+
+      const label = typeof row.label === "string" ? row.label.trim() : "";
+      const optionValue = typeof row.value === "string" ? sanitizeAnswer(row.value) : "";
+
+      if (!label || !optionValue) {
+        return [];
+      }
+
+      return [
+        {
+          label,
+          value: optionValue,
+        },
+      ];
+    }),
+  );
+}
+
+function normalizeDynamicOnboardingQuestion(value: unknown): DynamicOnboardingQuestion | null {
+  if (!isRecord(value) || typeof value.key !== "string") {
+    return null;
+  }
+
+  const canonicalQuestion = QUESTION_BY_KEY.get(value.key as OnboardingQuestionKey);
+  if (!canonicalQuestion) {
+    return null;
+  }
+
+  const prompt = typeof value.prompt === "string" && value.prompt.trim() ? value.prompt.trim() : canonicalQuestion.prompt;
+  const title = typeof value.title === "string" && value.title.trim() ? value.title.trim() : canonicalQuestion.title;
+  const placeholder =
+    typeof value.placeholder === "string" && value.placeholder.trim()
+      ? value.placeholder.trim()
+      : canonicalQuestion.placeholder;
+
+  return {
+    key: canonicalQuestion.key,
+    title,
+    prompt,
+    placeholder,
+    optional: canonicalQuestion.optional,
+    recommendedOptions: normalizeRecommendedOptions(value.recommendedOptions),
+    askedAt: typeof value.askedAt === "string" && value.askedAt.trim() ? value.askedAt.trim() : new Date(0).toISOString(),
+    source: "ai",
+  };
+}
+
+function normalizeDynamicOnboardingHistory(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] satisfies DynamicOnboardingQuestion[];
+  }
+
+  return value.flatMap((row) => {
+    const question = normalizeDynamicOnboardingQuestion(row);
+    return question ? [question] : [];
+  });
+}
+
+function extractOnboardingSummaryOptions(value: unknown): Required<BuildOnboardingSummaryOptions> {
+  if (!isRecord(value)) {
+    return {
+      mode: "fallback",
+      runtime: null,
+      dynamicHistory: [],
+    };
+  }
+
+  const mode = normalizeOnboardingMode(value.mode);
+  const runtime = normalizeOnboardingRuntimeConfig(value.runtime);
+  const dynamicHistory =
+    mode === "ai_dynamic" && isRecord(value.dynamic) ? normalizeDynamicOnboardingHistory(value.dynamic.history) : [];
+
+  return {
+    mode,
+    runtime,
+    dynamicHistory,
+  };
 }
 
 function inferGenreTrack(summary: OnboardingSummary) {
@@ -762,7 +908,20 @@ export function upsertOnboardingAnswer(
   return answers.map((entry, index) => (index === existingIndex ? nextEntry : entry));
 }
 
-export function buildOnboardingSummary(answers: OnboardingAnswerEntry[]): OnboardingSummary {
+export function getRemainingOnboardingQuestions(answers: OnboardingAnswerEntry[]) {
+  const resolved = new Set(
+    answers
+      .filter((entry) => Boolean(entry.answer) || entry.skipped)
+      .map((entry) => entry.questionKey),
+  );
+
+  return ONBOARDING_QUESTIONS.filter((question) => !resolved.has(question.key));
+}
+
+export function buildOnboardingSummary(
+  answers: OnboardingAnswerEntry[],
+  options: BuildOnboardingSummaryOptions = {},
+): OnboardingSummary {
   const projectBasics = readAnswer(answers, "project_basics");
   const coreConflict = readAnswer(answers, "core_conflict");
   const worldRules = readAnswer(answers, "world_rules");
@@ -770,6 +929,9 @@ export function buildOnboardingSummary(answers: OnboardingAnswerEntry[]): Onboar
   const styleRules = readAnswer(answers, "style_rules");
   const researchNeeds = readAnswer(answers, "research_needs");
   const answeredCount = answers.filter((entry) => entry.answer || entry.skipped).length;
+  const mode = options.mode ?? "fallback";
+  const runtime = options.runtime ?? null;
+  const dynamicHistory = mode === "ai_dynamic" ? normalizeDynamicOnboardingHistory(options.dynamicHistory) : [];
   const answersView = ONBOARDING_QUESTIONS.map((question) => {
     const answerEntry = answers.find((entry) => entry.questionKey === question.key);
     return {
@@ -809,16 +971,56 @@ export function buildOnboardingSummary(answers: OnboardingAnswerEntry[]): Onboar
       totalQuestions: ONBOARDING_QUESTIONS.length,
       isReadyToFinalize: answeredCount >= ONBOARDING_QUESTIONS.length,
     },
+    mode,
+    runtime,
+    dynamic: {
+      isAiDriven: mode === "ai_dynamic",
+      history: dynamicHistory,
+    },
   };
 }
 
-export function normalizeOnboardingSummary(value: unknown) {
-  if (!isRecord(value)) {
-    return buildOnboardingSummary([]);
+function buildFallbackCurrentQuestion(
+  currentQuestionIndex: number,
+  answers: OnboardingAnswerEntry[],
+  summary: OnboardingSummary,
+) {
+  const currentQuestion = getOnboardingQuestion(currentQuestionIndex);
+  if (!currentQuestion) {
+    return null;
   }
 
-  const answers = normalizeOnboardingAnswers((value as { answers?: unknown }).answers);
-  return buildOnboardingSummary(answers);
+  return {
+    ...currentQuestion,
+    answer: readAnswer(answers, currentQuestion.key),
+    recommendedOptions: buildOnboardingRecommendedOptions(currentQuestion, summary),
+    source: "fallback" as const,
+  };
+}
+
+function buildAiDynamicCurrentQuestion(answers: OnboardingAnswerEntry[], summary: OnboardingSummary) {
+  const currentQuestion = summary.dynamic.history.at(-1);
+  if (!currentQuestion) {
+    return null;
+  }
+
+  return {
+    key: currentQuestion.key,
+    title: currentQuestion.title,
+    prompt: currentQuestion.prompt,
+    placeholder: currentQuestion.placeholder,
+    optional: currentQuestion.optional,
+    answer: readAnswer(answers, currentQuestion.key),
+    recommendedOptions: currentQuestion.recommendedOptions,
+    source: "ai" as const,
+  };
+}
+
+export function normalizeOnboardingSummary(value: unknown, answers?: OnboardingAnswerEntry[]) {
+  const normalizedAnswers =
+    answers ?? (isRecord(value) ? normalizeOnboardingAnswers((value as { answers?: unknown }).answers) : []);
+  const options = extractOnboardingSummaryOptions(value);
+  return buildOnboardingSummary(normalizedAnswers, options);
 }
 
 export function serializeOnboardingSession(session: {
@@ -833,19 +1035,24 @@ export function serializeOnboardingSession(session: {
   updatedAt: Date | string;
 }): OnboardingSessionPayload {
   const answers = normalizeOnboardingAnswers(session.answers);
-  const summary = buildOnboardingSummary(answers);
-  const currentQuestion = getOnboardingQuestion(session.currentQuestionIndex);
-  const currentAnswer = currentQuestion ? readAnswer(answers, currentQuestion.key) : "";
-  const recommendedOptions = currentQuestion ? buildOnboardingRecommendedOptions(currentQuestion, summary) : [];
+  const summary = normalizeOnboardingSummary(session.summary, answers);
+  const currentQuestion =
+    session.status === "active"
+      ? summary.mode === "ai_dynamic"
+        ? buildAiDynamicCurrentQuestion(answers, summary)
+        : buildFallbackCurrentQuestion(session.currentQuestionIndex, answers, summary)
+      : null;
 
   return {
     id: session.id,
     status: session.status,
     currentQuestionIndex: session.currentQuestionIndex,
     totalQuestions: ONBOARDING_QUESTIONS.length,
-    currentQuestion: currentQuestion ? { ...currentQuestion, answer: currentAnswer, recommendedOptions } : null,
+    currentQuestion,
     answers,
     summary,
+    mode: summary.mode,
+    runtime: summary.runtime,
     finalizedProjectId: session.finalizedProjectId ?? null,
     completedAt: session.completedAt ? new Date(session.completedAt).toISOString() : null,
     createdAt: new Date(session.createdAt).toISOString(),

@@ -14,6 +14,7 @@ const nextBin = "node_modules/next/dist/bin/next";
 const promptOverlayMarker = "强调交易收益链和港岛势力秩序";
 const skillOverlayMarker = "Reviewer 偏重";
 const onboardingTitle = "港综资本局";
+const aiOnboardingTitle = "AI港综夜局";
 const blankProjectTitle = "港口旧账局";
 const blankAuthorNotes = "已有材料以码头账本和旧商会恩怨为主线，请先整理再补问。";
 const blankMarkdownMarker = "旧账簿显示，第七码头的夜班仓位会优先让给能当场结清税票的人。";
@@ -24,6 +25,83 @@ const blankConflictAnswer = "主角要借夜班仓位调度撬开旧账局，但
 const blankWorldRulesAnswer = "越过税票和夜航底线就会被港务、巡捕和黑平码头一起清场，不能硬闯。";
 const blankFactionsAnswer = "旧商会、码头帮、巡捕内线和船运金主四方互相制衡，谁都想先吃掉主角手里的旧账。";
 const blankStyleAnswer = "章节先打收益点，再补规则解释；港口税票与夜航制度只做轻量考据。";
+const onboardingDynamicMarker = "ONBOARDING_DYNAMIC_JSON";
+const aiOnboardingAnswerByKey = {
+  project_basics: "暂定名《AI港综夜局》，题材是港综商战，平台走番茄，目标长篇。",
+  core_conflict: "主角必须先赢下一场能证明自己价值的小局，否则资金、人脉和盟友都会被旧势力抽走。",
+  world_rules: "港岛这套局里最不能碰的是制度红线和现金流底线，一旦越线就会被监管和地下势力一起清场。",
+  factions: "旧财团、社团白手套、警方内线和师门旧部四方都想吃掉主角手里的筹码，合作和背刺并存。",
+  style_rules: "章节要短钩子强，重点写交易收益链和势力秩序，禁写低效误会与无收益抒情。",
+  research_needs: "金融法规、港岛地理和警务体系需要查证，但只能作为事实辅助，不直接改剧情设定。",
+};
+const aiOnboardingQuestionTemplates = {
+  project_basics: {
+    title: "先把项目基本盘锁准",
+    prompt: "先把这本书的暂定名、题材、平台和篇幅预期锁准，方便后面继续追问。",
+    placeholder: "例如：暂定名《AI港综夜局》，题材是港综商战，平台走番茄，目标做长篇。",
+    recommendedOptions: [
+      {
+        label: "番茄长篇",
+        value: "暂定名《AI港综夜局》，题材是港综商战，平台走番茄，目标做长篇连载。",
+      },
+    ],
+  },
+  core_conflict: {
+    title: "主角先要赢哪一局",
+    prompt: "基于这个题材，主角眼下必须先赢下哪一场局，才能真正开始上位？",
+    placeholder: "例如：先赢下一场能证明自己价值的小局。",
+    recommendedOptions: [
+      {
+        label: "先赢第一局",
+        value: aiOnboardingAnswerByKey.core_conflict,
+      },
+    ],
+  },
+  world_rules: {
+    title: "这套规则最怕什么越线",
+    prompt: "这个世界里最不能碰的底线和失败代价分别是什么？",
+    placeholder: "例如：越线后会遭遇制度和地下势力双重清场。",
+    recommendedOptions: [
+      {
+        label: "越线有代价",
+        value: aiOnboardingAnswerByKey.world_rules,
+      },
+    ],
+  },
+  factions: {
+    title: "谁会先卡主角的脖子",
+    prompt: "请先锁定关键势力与关系锚点，谁会先卡主角，谁又可能临时结盟？",
+    placeholder: "例如：旧财团、社团、警方内线和师门旧部如何彼此制衡。",
+    recommendedOptions: [
+      {
+        label: "四方制衡",
+        value: aiOnboardingAnswerByKey.factions,
+      },
+    ],
+  },
+  style_rules: {
+    title: "文风和节奏怎么定",
+    prompt: "这本书的节奏、钩子密度、叙述口吻和禁写项先怎么定？",
+    placeholder: "例如：章节要短钩子强，禁写低效误会。",
+    recommendedOptions: [
+      {
+        label: "快节奏强钩子",
+        value: aiOnboardingAnswerByKey.style_rules,
+      },
+    ],
+  },
+  research_needs: {
+    title: "哪些外部事实必须查",
+    prompt: "最后补一下考据边界：哪些外部事实必须查，哪些内容只按项目内设写？",
+    placeholder: "例如：法规、地理、制度流程需要查，剧情事实以内设为准。",
+    recommendedOptions: [
+      {
+        label: "只查现实外壳",
+        value: aiOnboardingAnswerByKey.research_needs,
+      },
+    ],
+  },
+};
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -122,6 +200,10 @@ function detectTaskKind(body) {
   const bodyText = extractBodyText(body);
   const matches = [
     {
+      taskKind: "onboarding_dynamic",
+      index: findFirstMarkerIndex(bodyText, [onboardingDynamicMarker]),
+    },
+    {
       taskKind: "ingest_sources",
       index: findFirstMarkerIndex(bodyText, [
         "ingest_sources",
@@ -146,11 +228,29 @@ function detectTaskKind(body) {
   return matches[0]?.taskKind ?? "workflow_check";
 }
 
+function buildAiOnboardingQuestionOutput(bodyText) {
+  const remainingKeys = Array.from(bodyText.matchAll(/^- ([a-z_]+) \|/gm), (match) => match[1]);
+  const questionKey = remainingKeys[0] || "core_conflict";
+  const template = aiOnboardingQuestionTemplates[questionKey] || aiOnboardingQuestionTemplates.core_conflict;
+
+  return JSON.stringify({
+    questionKey,
+    title: template.title,
+    prompt: template.prompt,
+    placeholder: template.placeholder,
+    recommendedOptions: template.recommendedOptions,
+  });
+}
+
 function buildTaskOutput(taskKind, body) {
   const bodyText = extractBodyText(body);
 
   if (bodyText.includes("Reply with exactly OK")) {
     return "OK";
+  }
+
+  if (taskKind === "onboarding_dynamic") {
+    return buildAiOnboardingQuestionOutput(bodyText);
   }
 
   if (taskKind === "ingest_sources") {
@@ -401,6 +501,23 @@ async function main() {
     assert(signup.cookies.length > 0, "signup succeeded but no session cookie was returned.");
 
     const cookies = signup.cookies;
+    const endpoint = await fetchJson(
+      `${baseUrl}/api/provider-endpoints`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          providerType: "openai",
+          label: "Mock OpenAI Onboarding Smoke",
+          baseURL: providerBaseUrl,
+          authMode: "none",
+          extraHeaders: {},
+          defaultModel: "gpt-4o-mini",
+        }),
+      },
+      cookies,
+    );
+    assertOk(endpoint, "endpoint creation");
 
     const sessionCreate = await fetchJson(
       `${baseUrl}/api/projects/bootstrap/session`,
@@ -502,23 +619,87 @@ async function main() {
       "onboarding_brief content was missing the summary section.",
     );
 
-    const endpoint = await fetchJson(
-      `${baseUrl}/api/provider-endpoints`,
+    const aiSessionCreate = await fetchJson(
+      `${baseUrl}/api/projects/bootstrap/session`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          providerType: "openai",
-          label: "Mock OpenAI Onboarding Smoke",
-          baseURL: providerBaseUrl,
-          authMode: "none",
-          extraHeaders: {},
-          defaultModel: "gpt-4o-mini",
+          name: aiOnboardingTitle,
+          genre: "港综商战",
+          platform: "番茄",
+          keywords: "资本局、势力经营、上位",
+          endpointId: endpoint.data.id,
+          modelId: "gpt-4o-mini",
         }),
       },
       cookies,
     );
-    assertOk(endpoint, "endpoint creation");
+    assertOk(aiSessionCreate, "create AI onboarding session");
+    assert(aiSessionCreate.data.session.mode === "ai_dynamic", "AI onboarding session did not enter ai_dynamic mode.");
+    assert(
+      aiSessionCreate.data.session.currentQuestion?.source === "ai",
+      "AI onboarding session did not expose an AI current question.",
+    );
+
+    let aiSession = aiSessionCreate.data.session;
+
+    while (aiSession.status !== "ready") {
+      const questionKey = aiSession.currentQuestion?.key;
+      assert(questionKey, "AI onboarding session lost its current question.");
+
+      const answer = aiOnboardingAnswerByKey[questionKey];
+      assert(answer, `Missing smoke answer for AI onboarding question ${questionKey}.`);
+
+      const aiAnswerResponse = await fetchJson(
+        `${baseUrl}/api/projects/bootstrap/session/${aiSession.id}/answer`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "answer",
+            answer,
+          }),
+        },
+        cookies,
+      );
+      assertOk(aiAnswerResponse, `answer AI onboarding question ${questionKey}`);
+      aiSession = aiAnswerResponse.data.session;
+    }
+
+    const aiFinalize = await fetchJson(
+      `${baseUrl}/api/projects/bootstrap/session/${aiSession.id}/finalize`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: aiOnboardingTitle,
+          genre: "港综商战",
+          platform: "番茄",
+        }),
+      },
+      cookies,
+    );
+    assertOk(aiFinalize, "finalize AI onboarding project");
+    const aiProjectId = aiFinalize.data.project.id;
+    const aiArtifacts = await fetchJson(
+      `${baseUrl}/api/projects/${aiProjectId}/artifacts`,
+      {
+        method: "GET",
+      },
+      cookies,
+    );
+    assertOk(aiArtifacts, "list AI onboarding artifacts");
+
+    const aiOnboardingBriefArtifact = findArtifactBy(
+      aiArtifacts.data.items,
+      (item) => item.artifactKey === "onboarding_brief",
+      "AI onboarding brief artifact",
+    );
+    assert(
+      aiOnboardingBriefArtifact.currentRevision?.content?.includes(aiOnboardingAnswerByKey.core_conflict),
+      "AI onboarding brief did not keep the dynamic answers.",
+    );
 
     const generate = await fetchJson(
       `${baseUrl}/api/projects/${projectId}/generate`,
@@ -561,6 +742,10 @@ async function main() {
     assert(
       providerRequestText.includes("项目专属 Skill Overlay") && providerRequestText.includes(skillOverlayMarker),
       "provider request did not include the project_skill_pack overlay.",
+    );
+    assert(
+      providerRequestText.includes(onboardingDynamicMarker),
+      "provider request did not include the AI onboarding planning prompt.",
     );
 
     const blankProjectCreate = await fetchJson(
@@ -910,6 +1095,7 @@ async function main() {
         providerBaseUrl,
         sessionId,
         guidedProjectId: projectId,
+        aiGuidedProjectId: aiProjectId,
         blankProjectId,
         endpointId: endpoint.data.id,
         guidedDraftId: generate.data.draftId,

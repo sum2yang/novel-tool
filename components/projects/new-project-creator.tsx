@@ -189,6 +189,8 @@ export function NewProjectCreator({
     lengthHint: "",
     era: "",
     keywords: "",
+    endpointId: "",
+    modelId: "",
   });
   const [guidedAnswer, setGuidedAnswer] = useState("");
   const [guidedPending, setGuidedPending] = useState(false);
@@ -203,6 +205,10 @@ export function NewProjectCreator({
   const selectedBlankEndpoint = useMemo(
     () => providerEndpoints.find((endpoint) => endpoint.id === blankForm.endpointId) ?? null,
     [blankForm.endpointId, providerEndpoints],
+  );
+  const selectedGuidedEndpoint = useMemo(
+    () => providerEndpoints.find((endpoint) => endpoint.id === guidedSeed.endpointId) ?? null,
+    [guidedSeed.endpointId, providerEndpoints],
   );
   const guidedProgressLabel = useMemo(() => {
     if (!session) {
@@ -224,6 +230,7 @@ export function NewProjectCreator({
 
     return [...GUIDED_FOLLOW_UP_HINTS];
   }, [guidedSeed.era, guidedSeed.genre, guidedSeed.keywords]);
+  const guidedUsesAi = Boolean(guidedSeed.endpointId && guidedSeed.modelId.trim());
   const canRunBlankAiPreparation =
     blankForm.prepareWithAi &&
     blankFiles.length > 0 &&
@@ -681,13 +688,19 @@ export function NewProjectCreator({
           lengthHint: guidedSeed.lengthHint.trim(),
           era: guidedSeed.era.trim(),
           keywords: guidedSeed.keywords.trim(),
+          endpointId: guidedSeed.endpointId || undefined,
+          modelId: guidedSeed.endpointId ? guidedSeed.modelId.trim() || undefined : undefined,
         }),
       });
 
       setSession(payload.session);
       setSessionId(payload.session.id);
       setGuidedAnswer(payload.session.currentQuestion?.answer ?? "");
-      setGuidedMessage("已按当前题材方向建立引导会话。");
+      setGuidedMessage(
+        payload.session.mode === "ai_dynamic"
+          ? `已使用 ${payload.session.runtime?.endpointLabel ?? "所选接口"} 建立 AI 动态引导会话。`
+          : "已建立本地引导问卷会话。",
+      );
       syncUrl("guided", payload.session.id);
     } catch (error) {
       setGuidedError(error instanceof Error ? error.message : "创建初始化会话失败。");
@@ -1205,8 +1218,45 @@ export function NewProjectCreator({
                 {!session ? (
                   <form className="space-y-5 rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.48)] p-5" onSubmit={handleStartGuidedSession}>
                     <p className="text-sm leading-7 text-[var(--ink-soft)]">
-                      先给出题材方向、平台和关键词，系统会先做轻量问题预判，再一次只问一个高价值问题。每一问都附带推荐选项，你也可以直接自定义填写。
+                      先给出题材方向，再决定是否接入模型接口。选了接口后会由模型逐问追问；不选时会回退到本地引导问卷。
                     </p>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm text-[var(--muted-ink)]">模型接口</label>
+                        <Select
+                          value={guidedSeed.endpointId}
+                          onChange={(event) => {
+                            const nextEndpoint =
+                              providerEndpoints.find((endpoint) => endpoint.id === event.target.value) ?? null;
+
+                            setGuidedSeed((current) => ({
+                              ...current,
+                              endpointId: event.target.value,
+                              modelId: nextEndpoint?.defaultModel ?? "",
+                            }));
+                          }}
+                        >
+                          <option value="">先不接 AI，使用本地问卷</option>
+                          {providerEndpoints.map((endpoint) => (
+                            <option key={endpoint.id} value={endpoint.id}>
+                              {endpoint.label} · {getProviderTypeLabel(endpoint.providerType)} · {getHealthLabel(endpoint.healthStatus)}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm text-[var(--muted-ink)]">模型名</label>
+                        <Input
+                          value={guidedSeed.modelId}
+                          onChange={(event) => setGuidedSeed((current) => ({ ...current, modelId: event.target.value }))}
+                          placeholder={selectedGuidedEndpoint?.defaultModel || "未选择接口时可留空"}
+                          disabled={!guidedSeed.endpointId}
+                        />
+                      </div>
+                    </div>
+
+                    {endpointError ? <p className="text-sm text-[#9f3a2f]">{endpointError}</p> : null}
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
@@ -1264,7 +1314,9 @@ export function NewProjectCreator({
                     </div>
 
                     <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-4">
-                      <p className="text-xs tracking-[0.16em] text-[var(--muted-ink)] uppercase">AI 将重点追问</p>
+                      <p className="text-xs tracking-[0.16em] text-[var(--muted-ink)] uppercase">
+                        {guidedUsesAi ? "AI 动态追问重点" : "本地问卷重点"}
+                      </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {guidedPreviewHints.map((item) => (
                           <Badge
@@ -1276,13 +1328,15 @@ export function NewProjectCreator({
                         ))}
                       </div>
                       <p className="mt-3 text-xs leading-6 text-[var(--muted-ink)]">
-                        你的当前输入会先写成一份“项目基本盘草稿”，第一问可以直接改它，后面的问题会围绕缺失信息继续推进。
+                        {guidedUsesAi
+                          ? `将使用 ${selectedGuidedEndpoint?.label ?? "所选接口"} / ${guidedSeed.modelId.trim() || "默认模型"} 生成首问，并在每次回答后决定下一问与推荐选项。`
+                          : "未选择接口时，会回退到当前内置问卷模式，按本地规则给出问题与推荐选项。"}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <Button type="submit" disabled={guidedPending}>
-                        {guidedPending ? "初始化中" : "开始 AI 引导提问"}
+                        {guidedPending ? "初始化中" : guidedUsesAi ? "开始 AI 动态提问" : "开始本地引导问卷"}
                       </Button>
                     </div>
                     {guidedError ? <p className="mt-4 text-sm text-[#9f3a2f]">{guidedError}</p> : null}
@@ -1295,6 +1349,12 @@ export function NewProjectCreator({
                         <p className="mt-1 text-xs leading-6 text-[var(--muted-ink)]">
                           当前状态：{getOnboardingStatusLabel(session.status)} · 进度 {guidedProgressLabel}
                         </p>
+                        <p className="text-xs leading-6 text-[var(--muted-ink)]">
+                          当前模式：{session.mode === "ai_dynamic" ? "AI 动态追问" : "本地问卷"}
+                          {session.mode === "ai_dynamic" && session.runtime
+                            ? ` · ${session.runtime.endpointLabel ?? "已选接口"} / ${session.runtime.modelId ?? "默认模型"}`
+                            : ""}
+                        </p>
                       </div>
                       <Badge>{getOnboardingStatusLabel(session.status)}</Badge>
                     </div>
@@ -1303,6 +1363,9 @@ export function NewProjectCreator({
                       <div className="rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.48)] p-5">
                         <p className="text-xs tracking-[0.16em] text-[var(--muted-ink)] uppercase">
                           问题 {session.currentQuestionIndex + 1}
+                        </p>
+                        <p className="mt-2 text-xs tracking-[0.16em] text-[var(--muted-ink)] uppercase">
+                          {session.currentQuestion.source === "ai" ? "AI 动态提问" : "本地规则提问"}
                         </p>
                         <h3 className="mt-2 font-serif text-lg text-[var(--ink)]">{session.currentQuestion.title}</h3>
                         <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">{session.currentQuestion.prompt}</p>
@@ -1482,6 +1545,12 @@ export function NewProjectCreator({
               ) : session ? (
                 <div className="space-y-4">
                   <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-4 text-xs leading-6 text-[var(--muted-ink)]">
+                    <p>引导模式：{session.mode === "ai_dynamic" ? "AI 动态追问" : "本地问卷"}</p>
+                    {session.mode === "ai_dynamic" && session.runtime ? (
+                      <p>
+                        使用接口：{session.runtime.endpointLabel ?? "已选接口"} / {session.runtime.modelId ?? "默认模型"}
+                      </p>
+                    ) : null}
                     <p>项目名建议：{session.summary.metadata.nameHint ?? "待确认"}</p>
                     <p>题材建议：{session.summary.metadata.genreHint ?? "待确认"}</p>
                     <p>平台建议：{session.summary.metadata.platformHint ?? "待确认"}</p>
@@ -1506,6 +1575,12 @@ export function NewProjectCreator({
               ) : Object.values(guidedSeed).some((value) => value.trim()) ? (
                 <div className="space-y-4">
                   <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-4 text-xs leading-6 text-[var(--muted-ink)]">
+                    <p>提问模式：{guidedUsesAi ? "AI 动态追问" : "本地问卷"}</p>
+                    {guidedUsesAi ? (
+                      <p>
+                        预选接口：{selectedGuidedEndpoint?.label ?? "已选接口"} / {guidedSeed.modelId.trim() || "默认模型"}
+                      </p>
+                    ) : null}
                     <p>题材方向：{guidedSeed.genre.trim() || "待填写"}</p>
                     <p>发布平台：{guidedSeed.platform.trim() || "待填写"}</p>
                     <p>篇幅预期：{guidedSeed.lengthHint.trim() || "待填写"}</p>
@@ -1528,7 +1603,7 @@ export function NewProjectCreator({
                 </div>
               ) : (
                 <p className="text-sm leading-7 text-[var(--muted-ink)]">
-                  AI 引导模式会以作者给出的题材为起点，逐步补齐主角目标、世界规则、势力关系和写作边界。
+                  引导模式会以作者给出的题材为起点。选了模型接口时由 AI 动态决定下一问；未选择接口时回退到本地问卷。
                 </p>
               )}
             </SectionPanel>

@@ -5,9 +5,7 @@ import { resolveRequestUser } from "@/lib/auth/identity";
 import { createProjectWithBootstrap } from "@/lib/projects/create-project";
 import {
   buildOnboardingBootstrapPackage,
-  buildOnboardingSummary,
-  normalizeOnboardingAnswers,
-  ONBOARDING_QUESTIONS,
+  normalizeOnboardingSummary,
   serializeOnboardingSession,
 } from "@/lib/projects/onboarding";
 import { toPrismaJson } from "@/lib/prisma-json";
@@ -34,12 +32,16 @@ export async function POST(
       throw new ApiError(409, "CONFLICT", "This onboarding session has already been finalized.");
     }
 
-    if (session.currentQuestionIndex < ONBOARDING_QUESTIONS.length) {
+    const serializedSession = serializeOnboardingSession({
+      ...session,
+      status: session.status,
+    });
+    const answers = serializedSession.answers;
+    const summary = normalizeOnboardingSummary(session.summary, answers);
+
+    if (!summary.completion.isReadyToFinalize) {
       throw new ApiError(422, "VALIDATION_ERROR", "Finish or skip all onboarding questions before finalizing.");
     }
-
-    const answers = normalizeOnboardingAnswers(session.answers);
-    const summary = buildOnboardingSummary(answers);
     const bootstrapPackage = buildOnboardingBootstrapPackage({
       name: payload.name,
       genre: payload.genre,
@@ -67,7 +69,7 @@ export async function POST(
         where: { id: session.id },
         data: {
           status: "finalized",
-          currentQuestionIndex: ONBOARDING_QUESTIONS.length,
+          currentQuestionIndex: summary.completion.totalQuestions,
           finalizedProjectId: created.project.id,
           completedAt: new Date(),
           summary: toPrismaJson(summary),

@@ -70,14 +70,26 @@ export const projectInputSchema = z.object({
   status: z.enum(PROJECT_STATUSES).default("active"),
 });
 
-export const onboardingSessionCreateSchema = z.object({
-  name: z.string().trim().max(120).optional(),
-  genre: z.string().trim().max(80).optional(),
-  platform: z.string().trim().max(80).optional(),
-  lengthHint: z.string().trim().max(80).optional(),
-  era: z.string().trim().max(120).optional(),
-  keywords: z.string().trim().max(240).optional(),
-});
+export const onboardingSessionCreateSchema = z
+  .object({
+    name: z.string().trim().max(120).optional(),
+    genre: z.string().trim().max(80).optional(),
+    platform: z.string().trim().max(80).optional(),
+    lengthHint: z.string().trim().max(80).optional(),
+    era: z.string().trim().max(120).optional(),
+    keywords: z.string().trim().max(240).optional(),
+    endpointId: z.string().trim().min(1).max(120).optional(),
+    modelId: z.string().trim().max(120).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.modelId && !value.endpointId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endpointId"],
+        message: "Select an endpoint before setting the onboarding model.",
+      });
+    }
+  });
 
 export const onboardingSessionAnswerSchema = z.object({
   action: z.enum(["answer", "skip", "back"]).default("answer"),

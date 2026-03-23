@@ -17,6 +17,7 @@
 - Linux DO OAuth 登录 / 注册（可选启用）
 - 项目创建
 - AI 引导创建与空白创建
+- AI 引导模式支持“先选模型接口动态逐问”与“无接口回退本地问卷”双路径
 - 作者自带资料上传
 - `ingest_sources` 资料吸收与结构化整理
 - `generate_setting` / `generate_outline` / `generate_chapter`
@@ -26,6 +27,7 @@
 - 项目级 API 预设（支持新增 / 删除 / 排序）
 - 远程 MCP 接入
 - 用户级 Grok / Tavily / Firecrawl 配置
+- 设置页支持删除未绑定历史生成记录的模型接口与远程 MCP 服务
 - 导出中心与服务端归档
 - Docker 本地联调
 - GitHub Actions + GHCR + 远端 Docker Compose 部署
@@ -47,6 +49,12 @@
 6. 对生成内容做审稿、最小修法和接受回填
 7. 在项目中持续维护状态卡、进度和 findings
 8. 导出正式章节、设定快照和项目状态摘要
+
+引导创建说明：
+
+- 先选择模型接口与模型名时，会由模型根据题材生成首问，并在每次回答后动态决定下一问和推荐选项
+- 没有选择模型接口时，会自动回退到当前内置本地问卷，不会阻塞项目初始化
+- 模型接口健康检查只验证“默认模型的最小探活请求”；如果正式生成携带大上下文、不同模型名或上游网关限制不同，仍可能在生成阶段失败
 
 ## 运行架构
 
@@ -223,6 +231,13 @@ docker compose --env-file .env.docker down
 - `npm run smoke:grok-e2e`
 - `npm run smoke:export-e2e`
 - `npm run smoke:deploy-remote`
+
+其中 `npm run smoke:onboarding-e2e` 当前覆盖：
+
+- fallback 本地引导问卷
+- 选择模型接口后的 AI 动态引导问答
+- guided finalize 产物写入
+- blank onboarding 材料整理与补问回写
 
 ## 部署方式
 
