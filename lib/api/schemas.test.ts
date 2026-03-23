@@ -20,6 +20,41 @@ describe("API input schemas", () => {
     expect(result.error.issues.some((issue) => issue.path.join(".") === "secret")).toBe(true);
   });
 
+  it("defaults OpenAI API style to responses", () => {
+    const result = providerEndpointInputSchema.safeParse({
+      providerType: "openai",
+      label: "OpenAI",
+      baseURL: "https://api.example.com/v1",
+      authMode: "none",
+      extraHeaders: {},
+      defaultModel: "gpt-4o-mini",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected provider endpoint schema to succeed.");
+    }
+    expect(result.data.openaiApiStyle).toBe("responses");
+  });
+
+  it("rejects OpenAI API style for non-OpenAI providers", () => {
+    const result = providerEndpointInputSchema.safeParse({
+      providerType: "gemini",
+      openaiApiStyle: "chat_completions",
+      label: "Gemini",
+      baseURL: "https://api.example.com/v1beta",
+      authMode: "none",
+      extraHeaders: {},
+      defaultModel: "gemini-2.5-pro",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected non-OpenAI provider schema to reject openaiApiStyle.");
+    }
+    expect(result.error.issues.some((issue) => issue.path.join(".") === "openaiApiStyle")).toBe(true);
+  });
+
   it("requires authPayload when MCP auth is enabled", () => {
     const result = mcpServerInputSchema.safeParse({
       name: "Archive Search",

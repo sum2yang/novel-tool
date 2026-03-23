@@ -15,6 +15,9 @@ export type TaskType = (typeof TASK_TYPES)[number];
 export const PROVIDER_TYPES = ["openai", "gemini", "anthropic"] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
+export const OPENAI_API_STYLES = ["responses", "chat_completions"] as const;
+export type OpenAIApiStyle = (typeof OPENAI_API_STYLES)[number];
+
 export const AUTH_MODES = ["none", "bearer", "api_key", "custom_header"] as const;
 export type AuthMode = (typeof AUTH_MODES)[number];
 

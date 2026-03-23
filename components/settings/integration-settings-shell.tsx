@@ -8,13 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getAuthModeLabel, getMcpTransportTypeLabel, getProviderTypeLabel } from "@/lib/integrations/display-labels";
+import {
+  getAuthModeLabel,
+  getMcpTransportTypeLabel,
+  getOpenAIApiStyleLabel,
+  getProviderTypeLabel,
+} from "@/lib/integrations/display-labels";
 import { getHealthStatusLabel } from "@/lib/integrations/health-status";
-import { AUTH_MODES, MCP_TRANSPORT_TYPES, PROVIDER_TYPES } from "@/lib/types/domain";
+import { AUTH_MODES, MCP_TRANSPORT_TYPES, OPENAI_API_STYLES, PROVIDER_TYPES } from "@/lib/types/domain";
 
 type ProviderEndpointItem = {
   id: string;
   providerType: string;
+  openaiApiStyle: string;
   label: string;
   baseURL: string;
   authMode: string;
@@ -121,6 +127,7 @@ export function IntegrationSettingsShell({
   grokStatus: GrokStatusSummary;
 }) {
   const router = useRouter();
+  const [endpointProviderType, setEndpointProviderType] = useState("openai");
   const [endpointError, setEndpointError] = useState<string | null>(null);
   const [endpointMessage, setEndpointMessage] = useState<string | null>(null);
   const [mcpError, setMcpError] = useState<string | null>(null);
@@ -152,6 +159,7 @@ export function IntegrationSettingsShell({
       },
       body: JSON.stringify({
         providerType: String(formData.get("providerType") ?? "openai"),
+        openaiApiStyle: String(formData.get("openaiApiStyle") ?? "responses"),
         label: String(formData.get("label") ?? "").trim(),
         baseURL: String(formData.get("baseURL") ?? "").trim(),
         authMode: String(formData.get("authMode") ?? "bearer"),
@@ -290,14 +298,19 @@ export function IntegrationSettingsShell({
                 try {
                   await handleEndpointSubmit(new FormData(form));
                   form.reset();
+                  setEndpointProviderType("openai");
                 } catch (error) {
                   setEndpointError(error instanceof Error ? error.message : "模型接口保存失败。");
                 }
               });
             }}
           >
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select name="providerType" defaultValue="openai">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Select
+                name="providerType"
+                defaultValue="openai"
+                onChange={(event) => setEndpointProviderType(event.currentTarget.value)}
+              >
                 {PROVIDER_TYPES.map((providerType) => (
                   <option key={providerType} value={providerType}>
                     {getProviderTypeLabel(providerType)}
@@ -311,7 +324,22 @@ export function IntegrationSettingsShell({
                   </option>
                 ))}
               </Select>
+              <Select
+                name="openaiApiStyle"
+                defaultValue="responses"
+                disabled={endpointProviderType !== "openai"}
+                aria-label="OpenAI API 模式"
+              >
+                {OPENAI_API_STYLES.map((apiStyle) => (
+                  <option key={apiStyle} value={apiStyle}>
+                    {getOpenAIApiStyleLabel(apiStyle)}
+                  </option>
+                ))}
+              </Select>
             </div>
+            <p className="text-xs text-[var(--muted-ink)]">
+              仅 OpenAI 需要选择接口模式。兼容 `/v1/chat/completions` 的上游，请切到 Chat Completions API。
+            </p>
             <Input name="label" placeholder="显示名称，例如 OpenAI Production" required />
             <Input name="baseURL" type="url" placeholder="https://api.openai.com/v1" required />
             <Input name="defaultModel" placeholder="默认模型，例如 gpt-5" required />
@@ -341,7 +369,12 @@ export function IntegrationSettingsShell({
                   <div className="min-w-0">
                     <p className="truncate text-sm text-[var(--ink)]">{endpoint.label}</p>
                     <p className="mt-1 text-xs text-[var(--muted-ink)]">
-                      {getProviderTypeLabel(endpoint.providerType)} · {endpoint.defaultModel}
+                      {getProviderTypeLabel(endpoint.providerType)}
+                      {endpoint.providerType === "openai"
+                        ? ` · ${getOpenAIApiStyleLabel(endpoint.openaiApiStyle)}`
+                        : ""}
+                      {" · "}
+                      {endpoint.defaultModel}
                     </p>
                     <p className="mt-1 text-xs text-[var(--muted-ink)]">鉴权方式：{getAuthModeLabel(endpoint.authMode)}</p>
                     <p className="mt-1 truncate text-xs text-[var(--muted-ink)]">{endpoint.baseURL}</p>

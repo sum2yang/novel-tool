@@ -3,9 +3,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const generateTextMock = vi.fn();
+const openaiDefaultModelMock = vi.fn((modelId: string) => ({ provider: "openai-default", modelId }));
+const openaiResponsesModelMock = vi.fn((modelId: string) => ({ provider: "openai-responses", modelId }));
+const openaiChatModelMock = vi.fn((modelId: string) => ({ provider: "openai-chat", modelId }));
+const createOpenAIMock = vi.fn(() =>
+  Object.assign((modelId: string) => openaiDefaultModelMock(modelId), {
+    chat: (modelId: string) => openaiChatModelMock(modelId),
+    responses: (modelId: string) => openaiResponsesModelMock(modelId),
+  }),
+);
+const createGoogleGenerativeAIMock = vi.fn(() => (modelId: string) => ({ provider: "gemini", modelId }));
+const createAnthropicMock = vi.fn(() => (modelId: string) => ({ provider: "anthropic", modelId }));
 
 vi.mock("ai", () => ({
   generateText: generateTextMock,
+}));
+
+vi.mock("@ai-sdk/openai", () => ({
+  createOpenAI: createOpenAIMock,
+}));
+
+vi.mock("@ai-sdk/google", () => ({
+  createGoogleGenerativeAI: createGoogleGenerativeAIMock,
+}));
+
+vi.mock("@ai-sdk/anthropic", () => ({
+  createAnthropic: createAnthropicMock,
 }));
 
 const BASE_ENV = {
@@ -31,6 +54,12 @@ describe("provider endpoint probe", () => {
   beforeEach(() => {
     vi.resetModules();
     generateTextMock.mockReset();
+    openaiDefaultModelMock.mockClear();
+    openaiResponsesModelMock.mockClear();
+    openaiChatModelMock.mockClear();
+    createOpenAIMock.mockClear();
+    createGoogleGenerativeAIMock.mockClear();
+    createAnthropicMock.mockClear();
 
     for (const [key, value] of Object.entries(BASE_ENV)) {
       vi.stubEnv(key, value);
@@ -40,6 +69,66 @@ describe("provider endpoint probe", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
+  });
+
+  it("uses OpenAI responses API by default", async () => {
+    const { encryptString } = await import("@/lib/security/crypto");
+    const { createLanguageModel } = await import("./factory");
+
+    const model = createLanguageModel(
+      {
+        id: "endpoint-responses",
+        userId: "user-1",
+        providerType: "openai",
+        openaiApiStyle: "responses",
+        label: "OpenAI Responses",
+        baseURL: "https://api.example.com/v1",
+        authMode: "bearer",
+        encryptedSecret: encryptString("secret"),
+        encryptedHeaders: {},
+        defaultModel: "gpt-5",
+        healthStatus: "misconfigured",
+        lastHealthCheckAt: null,
+        createdAt: new Date("2026-03-20T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-20T00:00:00.000Z"),
+      },
+      "gpt-5",
+    );
+
+    expect(createOpenAIMock).toHaveBeenCalledTimes(1);
+    expect(openaiResponsesModelMock).toHaveBeenCalledWith("gpt-5");
+    expect(openaiChatModelMock).not.toHaveBeenCalled();
+    expect(model).toEqual({ provider: "openai-responses", modelId: "gpt-5" });
+  });
+
+  it("uses OpenAI chat completions when configured", async () => {
+    const { encryptString } = await import("@/lib/security/crypto");
+    const { createLanguageModel } = await import("./factory");
+
+    const model = createLanguageModel(
+      {
+        id: "endpoint-chat",
+        userId: "user-1",
+        providerType: "openai",
+        openaiApiStyle: "chat_completions",
+        label: "OpenAI Chat",
+        baseURL: "https://api.example.com/v1",
+        authMode: "bearer",
+        encryptedSecret: encryptString("secret"),
+        encryptedHeaders: {},
+        defaultModel: "gpt-4o",
+        healthStatus: "misconfigured",
+        lastHealthCheckAt: null,
+        createdAt: new Date("2026-03-20T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-20T00:00:00.000Z"),
+      },
+      "gpt-4o",
+    );
+
+    expect(createOpenAIMock).toHaveBeenCalledTimes(1);
+    expect(openaiChatModelMock).toHaveBeenCalledWith("gpt-4o");
+    expect(openaiResponsesModelMock).not.toHaveBeenCalled();
+    expect(model).toEqual({ provider: "openai-chat", modelId: "gpt-4o" });
   });
 
   it("marks the endpoint healthy after a successful minimal probe", async () => {
@@ -54,6 +143,7 @@ describe("provider endpoint probe", () => {
       id: "endpoint-1",
       userId: "user-1",
       providerType: "openai",
+      openaiApiStyle: "responses",
       label: "OpenAI Mock",
       baseURL: "https://api.example.com/v1",
       authMode: "bearer",
@@ -88,6 +178,7 @@ describe("provider endpoint probe", () => {
       id: "endpoint-2",
       userId: "user-1",
       providerType: "anthropic",
+      openaiApiStyle: "responses",
       label: "Anthropic Mock",
       baseURL: "https://api.example.com",
       authMode: "bearer",
@@ -114,6 +205,7 @@ describe("provider endpoint probe", () => {
       id: "endpoint-3",
       userId: "user-1",
       providerType: "gemini",
+      openaiApiStyle: "responses",
       label: "Gemini Mock",
       baseURL: "https://api.example.com",
       authMode: "bearer",
@@ -140,6 +232,7 @@ describe("provider endpoint probe", () => {
       id: "endpoint-4",
       userId: "user-1",
       providerType: "openai",
+      openaiApiStyle: "responses",
       label: "OpenAI Mock",
       baseURL: "https://api.example.com/v1",
       authMode: "bearer",

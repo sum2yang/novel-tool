@@ -9,12 +9,12 @@ import type { GrokRuntimeConfig } from "@/lib/search/grok-config";
 import type { GrokToolName, TaskType } from "@/lib/types/domain";
 
 const TOOL_TIMEOUTS: Record<GrokToolName, number> = {
-  web_search: 60000,
-  get_sources: 30000,
-  web_fetch: 45000,
-  web_map: 60000,
-  get_config_info: 20000,
-  search_planning: 30000,
+  web_search: 90000,
+  get_sources: 45000,
+  web_fetch: 90000,
+  web_map: 90000,
+  get_config_info: 30000,
+  search_planning: 45000,
 };
 
 const RETRY_BASE_DELAY = 1000;

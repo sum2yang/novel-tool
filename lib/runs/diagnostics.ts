@@ -310,8 +310,13 @@ export function getRunFailureHint(errorSummary: string | null | undefined, error
     return "先检查当前接口的密钥、鉴权方式和默认模型是否匹配。";
   }
 
-  if (code === "TIMEOUT" || normalized.includes("timeout") || normalized.includes("timed out")) {
-    return "当前外部服务响应过慢。建议减少启用的增强能力，或稍后重试。";
+  if (
+    code === "TIMEOUT" ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("gateway timeout")
+  ) {
+    return "当前是上游网关超时。平台已适度放宽等待时间，但如果上游服务本身超时，仍建议先减少 MCP / 外部事实 / 上下文体量，或检查上游代理超时配置后再重试。";
   }
 
   if (code === "MODEL_UNAVAILABLE" || normalized.includes("model")) {

@@ -57,12 +57,19 @@ export function createLanguageModel(endpoint: ProviderEndpoint, modelId: string)
   const headers = decryptRecord(endpoint.encryptedHeaders);
 
   switch (endpoint.providerType) {
-    case "openai":
-      return createOpenAI({
+    case "openai": {
+      const provider = createOpenAI({
         baseURL: endpoint.baseURL,
         apiKey,
         headers,
-      })(modelId);
+      });
+
+      if (endpoint.openaiApiStyle === "chat_completions") {
+        return provider.chat(modelId);
+      }
+
+      return provider.responses(modelId);
+    }
     case "gemini":
       return createGoogleGenerativeAI({
         baseURL: endpoint.baseURL,

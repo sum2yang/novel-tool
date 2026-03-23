@@ -73,6 +73,7 @@ describe("run diagnostics helpers", () => {
     expect(getGrokConfigSourceLabel("mixed")).toBe("混合来源");
     expect(getGrokConfigSourceLabel("env")).toBe("平台默认");
     expect(getRunFailureHint("MCP tool loading failed.", null)).toContain("MCP");
+    expect(getRunFailureHint("Failed after 3 attempts. Last error: Gateway Timeout", "TIMEOUT")).toContain("上游网关超时");
     expect(
       buildOperatorErrorMessage({
         error: {

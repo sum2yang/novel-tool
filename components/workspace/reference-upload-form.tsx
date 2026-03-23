@@ -13,6 +13,7 @@ type ReferenceUploadFormProps = {
 export function ReferenceUploadForm({ projectId }: ReferenceUploadFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -33,6 +34,7 @@ export function ReferenceUploadForm({ projectId }: ReferenceUploadFormProps) {
 
         const payload = (await response.json().catch(() => null)) as
           | { error?: { message?: string } }
+          | { count?: number; filenames?: string[] }
           | { filename?: string }
           | null;
 
@@ -43,7 +45,21 @@ export function ReferenceUploadForm({ projectId }: ReferenceUploadFormProps) {
         }
 
         formRef.current?.reset();
-        setMessage(payload && "filename" in payload ? `已导入 ${payload.filename}` : "资料已导入。");
+        const selectedCount = fileInputRef.current?.files?.length ?? 0;
+        if (payload && "count" in payload && typeof payload.count === "number") {
+          const previewNames = Array.isArray(payload.filenames) ? payload.filenames.slice(0, 3).join("、") : "";
+          setMessage(
+            payload.count === 1
+              ? `已导入 ${previewNames || "1 份资料"}`
+              : `已导入 ${payload.count} 份资料${previewNames ? `：${previewNames}` : ""}`,
+          );
+        } else if (payload && "filename" in payload) {
+          setMessage(`已导入 ${payload.filename}`);
+        } else if (selectedCount > 1) {
+          setMessage(`已导入 ${selectedCount} 份资料。`);
+        } else {
+          setMessage("资料已导入。");
+        }
         router.refresh();
       } catch (error) {
         setError(error instanceof Error ? error.message : "Reference upload failed.");
@@ -56,9 +72,11 @@ export function ReferenceUploadForm({ projectId }: ReferenceUploadFormProps) {
       <div>
         <label className="mb-2 block text-xs tracking-[0.16em] text-[var(--muted-ink)] uppercase">上传文件</label>
         <Input
-          name="file"
+          ref={fileInputRef}
+          name="files"
           type="file"
           required
+          multiple
           accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html"
           className="file:mr-3 file:rounded-full file:border-0 file:bg-[var(--panel)] file:px-3 file:py-2 file:text-xs file:text-[var(--ink)]"
         />
@@ -75,7 +93,9 @@ export function ReferenceUploadForm({ projectId }: ReferenceUploadFormProps) {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-[var(--muted-ink)]">支持 `.txt` / `.md` / `.html`，上传后会自动提取正文并归档原文件。</p>
+        <p className="text-xs text-[var(--muted-ink)]">
+          支持一次选择多份 `.txt` / `.md` / `.html`，标签和来源 URL 会应用到本次所有文件。
+        </p>
         <Button type="submit" size="sm" disabled={isPending}>
           {isPending ? "导入中" : "导入资料"}
         </Button>
