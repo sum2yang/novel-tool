@@ -35,8 +35,9 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/knowledge ./knowledge
 COPY --from=builder /app/scripts ./scripts
 
-RUN chmod +x ./scripts/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /app/scripts/docker-entrypoint.sh \
+  && chmod +x /app/scripts/docker-entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["./scripts/docker-entrypoint.sh"]
+CMD ["/app/scripts/docker-entrypoint.sh"]

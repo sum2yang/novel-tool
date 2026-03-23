@@ -59,6 +59,7 @@ function resolveLinuxDoUser(profile: LinuxDoProfile) {
 
 const linuxDoClientId = env.LINUX_DO_CLIENT_ID?.trim();
 const linuxDoClientSecret = env.LINUX_DO_CLIENT_SECRET?.trim();
+const trustedOrigins = [...new Set([env.APP_BASE_URL, env.BETTER_AUTH_URL].map((value) => value.trim()).filter(Boolean))];
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -91,5 +92,5 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  trustedOrigins: [env.APP_BASE_URL],
+  trustedOrigins,
 });

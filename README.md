@@ -152,6 +152,7 @@ cp .env.docker.example .env.docker
 
 - 本地 Compose 环境里 `DATABASE_URL` 默认应保持连接容器内主机名 `postgres`
 - `APP_IMAGE` 本地开发时通常留空
+- 如果你通过域名或反向代理访问站点，`BETTER_AUTH_URL` 和 `APP_BASE_URL` 必须改成实际对外访问地址；否则 Better Auth 会报 `Invalid origin`，导致注册、登录和退出登录失败
 - 当用户没有填写个人 Grok / Tavily / Firecrawl 配置时，应用会按这 7 个字段逐项回退到平台默认
 - 如果同时填写 `LINUX_DO_CLIENT_ID` 和 `LINUX_DO_CLIENT_SECRET`，登录页和注册页会自动显示 `Linux DO` 登录 / 注册按钮
 
