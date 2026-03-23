@@ -43,7 +43,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  let uploadedStorageKey: string | null = null;
+  const uploadedStorageKeys: string[] = [];
 
   try {
     const [{ id }, user] = await Promise.all([params, resolveRequestUser(request)]);
@@ -53,12 +53,35 @@ export async function POST(
     }
 
     const contentType = request.headers.get("content-type") ?? "";
-    const payload = contentType.includes("multipart/form-data")
-      ? await parseReferenceUpload(request, id)
-      : await parseJson(request, referenceInputSchema);
+    if (contentType.includes("multipart/form-data")) {
+      const payloads = await parseReferenceUpload(request, id);
+      uploadedStorageKeys.push(
+        ...payloads
+          .map((payload) => payload.storageKey)
+          .filter((storageKey): storageKey is string => Boolean(storageKey)),
+      );
 
-    uploadedStorageKey = payload.storageKey ?? null;
+      const references = await prisma.$transaction(async (tx) =>
+        Promise.all(
+          payloads.map((payload) =>
+            tx.referenceDocument.create({
+              data: {
+                projectId: id,
+                ...payload,
+              },
+            }),
+          ),
+        ),
+      );
 
+      return jsonCreated({
+        count: references.length,
+        filenames: references.map((reference) => reference.filename),
+        items: references,
+      });
+    }
+
+    const payload = await parseJson(request, referenceInputSchema);
     const reference = await prisma.referenceDocument.create({
       data: {
         projectId: id,
@@ -68,8 +91,8 @@ export async function POST(
 
     return jsonCreated(reference);
   } catch (error) {
-    if (uploadedStorageKey) {
-      await deleteObject(uploadedStorageKey).catch(() => undefined);
+    if (uploadedStorageKeys.length > 0) {
+      await Promise.allSettled(uploadedStorageKeys.map((storageKey) => deleteObject(storageKey)));
     }
 
     return jsonError(error);
@@ -91,15 +114,22 @@ function parseTagList(rawValues: FormDataEntryValue[]) {
   return Array.from(new Set(tags));
 }
 
+function parseFileList(formData: FormData) {
+  const entries = [...formData.getAll("files"), ...formData.getAll("files[]"), ...formData.getAll("file")];
+  const files = entries.filter((entry): entry is File => entry instanceof File && entry.name.trim().length > 0);
+
+  if (files.length === 0) {
+    throw new ApiError(422, "VALIDATION_ERROR", "At least one reference file is required.");
+  }
+
+  return files;
+}
+
 async function parseReferenceUpload(request: Request, projectId: string) {
   const formData = await request.formData();
-  const file = formData.get("file");
   const sourceUrlValue = formData.get("sourceUrl");
   const sourceUrl = typeof sourceUrlValue === "string" ? sourceUrlValue.trim() : "";
-
-  if (!(file instanceof File)) {
-    throw new ApiError(422, "VALIDATION_ERROR", "A reference file is required.");
-  }
+  const files = parseFileList(formData);
 
   if (sourceUrl) {
     try {
@@ -112,10 +142,17 @@ async function parseReferenceUpload(request: Request, projectId: string) {
 
   const tags = parseTagList([...formData.getAll("tags"), ...formData.getAll("tags[]")]);
 
-  return ingestUploadedReference({
-    projectId,
-    file,
-    sourceUrl: sourceUrl || undefined,
-    tags,
-  });
+  const payloads = [];
+  for (const file of files) {
+    payloads.push(
+      await ingestUploadedReference({
+        projectId,
+        file,
+        sourceUrl: sourceUrl || undefined,
+        tags,
+      }),
+    );
+  }
+
+  return payloads;
 }

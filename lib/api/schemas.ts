@@ -6,6 +6,7 @@ import {
   DRAFT_STATUSES,
   GROK_TOOL_NAMES,
   MCP_TRANSPORT_TYPES,
+  OPENAI_API_STYLES,
   PROJECT_STATUSES,
   PROVIDER_TYPES,
   REFERENCE_SOURCE_TYPES,
@@ -27,6 +28,7 @@ const externalPromptTemplateSchema = z.object({
 export const providerEndpointInputSchema = z
   .object({
     providerType: z.enum(PROVIDER_TYPES),
+    openaiApiStyle: z.enum(OPENAI_API_STYLES).default("responses"),
     label: z.string().min(1).max(80),
     baseURL: z.string().url(),
     authMode: z.enum(AUTH_MODES).default("bearer"),
@@ -40,6 +42,14 @@ export const providerEndpointInputSchema = z
         code: z.ZodIssueCode.custom,
         path: ["secret"],
         message: "A secret is required when auth mode is enabled.",
+      });
+    }
+
+    if (value.providerType !== "openai" && value.openaiApiStyle !== "responses") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["openaiApiStyle"],
+        message: "OpenAI API style can only be set when provider type is OpenAI.",
       });
     }
   });

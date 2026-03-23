@@ -60,7 +60,7 @@ export function WorkbenchShell({
         <div className="space-y-5">
           <SectionPanel
             title="资料区"
-            description="上传 `.txt` / `.md` / `.html`，并在这里查看抽取结果和标签。"
+            description="支持批量上传 `.txt` / `.md` / `.html`，并在这里查看抽取结果和标签。"
             action={<Badge>{project.references.length} 份资料</Badge>}
           >
             <div className="space-y-3">

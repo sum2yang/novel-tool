@@ -13,6 +13,11 @@ enum ProviderType {
   anthropic
 }
 
+enum OpenAIApiStyle {
+  responses
+  chat_completions
+}
+
 enum AuthMode {
   none
   bearer
@@ -156,6 +161,7 @@ model ProviderEndpoint {
   id                String       @id @default(cuid())
   userId            String
   providerType      ProviderType
+  openaiApiStyle    OpenAIApiStyle @default(responses)
   label             String
   baseURL           String
   authMode          AuthMode

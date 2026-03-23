@@ -8,6 +8,8 @@ import { createRemoteMcpClient } from "@/lib/mcp/client";
 import { toPrismaJson } from "@/lib/prisma-json";
 import { createLanguageModel } from "@/lib/providers/factory";
 
+const GENERATION_REQUEST_TIMEOUT_MS = 180000;
+
 type McpClient = Awaited<ReturnType<typeof createRemoteMcpClient>>;
 
 type GenerationExecutionInput = {
@@ -197,6 +199,9 @@ export async function executeGeneration(input: GenerationExecutionInput): Promis
       prompt: input.prompt,
       temperature: input.temperature,
       maxOutputTokens: input.maxOutputTokens,
+      timeout: {
+        totalMs: GENERATION_REQUEST_TIMEOUT_MS,
+      },
       tools: Object.keys(loadedMcpTools.tools).length > 0 ? loadedMcpTools.tools : undefined,
       stopWhen: Object.keys(loadedMcpTools.tools).length > 0 ? stepCountIs(5) : undefined,
     });

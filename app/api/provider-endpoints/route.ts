@@ -14,6 +14,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         providerType: true,
+        openaiApiStyle: true,
         label: true,
         baseURL: true,
         authMode: true,
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         providerType: payload.providerType,
+        openaiApiStyle: payload.openaiApiStyle,
         label: payload.label,
         baseURL: payload.baseURL,
         authMode: payload.authMode,
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         providerType: true,
+        openaiApiStyle: true,
         label: true,
         baseURL: true,
         authMode: true,

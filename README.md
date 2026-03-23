@@ -10,6 +10,7 @@
 - 项目资料、设定、卷纲、章节、审稿结果都能在同一工作台里沉淀。
 - AI 不再只负责“生成一段文本”，而是参与资料整理、问题发现、最小修法和状态同步。
 - 模型接口、远程 MCP、Grok / Tavily / Firecrawl 都能按项目或按用户独立配置。
+- OpenAI 兼容接口可按端点切换 `Responses API` 或 `/v1/chat/completions`。
 
 ## 当前已经具备的能力
 
@@ -19,12 +20,14 @@
 - AI 引导创建与空白创建
 - AI 引导模式支持“先选模型接口动态逐问”与“无接口回退本地问卷”双路径
 - 作者自带资料上传
+- 资料区支持批量上传作者材料
 - `ingest_sources` 资料吸收与结构化整理
 - `generate_setting` / `generate_outline` / `generate_chapter`
 - `review_content` / `minimal_fix` / `sync_state`
 - Draft / accept / revision 闭环
 - 章节编辑、自动保存、审稿定位
 - 项目级 API 预设（支持新增 / 删除 / 排序）
+- OpenAI 端点支持 `Responses API` / `Chat Completions API` 显式切换
 - 远程 MCP 接入
 - 用户级 Grok / Tavily / Firecrawl 配置
 - 设置页支持删除未绑定历史生成记录的模型接口与远程 MCP 服务
@@ -64,6 +67,7 @@
 - 认证：Better Auth
 - 对象存储：S3 兼容接口，默认可用 MinIO
 - 模型接入：OpenAI / Gemini / Anthropic 自定义 URL
+- OpenAI 兼容层：支持 `Responses API` 与 `Chat Completions API` 两种请求模式
 - 外部扩展：远程 MCP、GrokSearch 风格聚合搜索上游配置
 
 ## 环境要求
@@ -161,6 +165,7 @@ cp .env.docker.example .env.docker
 - 本地 Compose 环境里 `DATABASE_URL` 默认应保持连接容器内主机名 `postgres`
 - `APP_IMAGE` 本地开发时通常留空
 - 如果你通过域名或反向代理访问站点，`BETTER_AUTH_URL` 和 `APP_BASE_URL` 必须改成实际对外访问地址；否则 Better Auth 会报 `Invalid origin`，导致注册、登录和退出登录失败
+- 如果某个 OpenAI 兼容上游只实现了 `/v1/chat/completions`，请在设置页把该端点的 API 模式切到 `Chat Completions API`
 - 当用户没有填写个人 Grok / Tavily / Firecrawl 配置时，应用会按这 7 个字段逐项回退到平台默认
 - 如果同时填写 `LINUX_DO_CLIENT_ID` 和 `LINUX_DO_CLIENT_SECRET`，登录页和注册页会自动显示 `Linux DO` 登录 / 注册按钮
 

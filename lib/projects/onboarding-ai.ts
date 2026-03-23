@@ -32,6 +32,7 @@ type RawAiOnboardingQuestionResult = {
 
 const QUESTION_BY_KEY = new Map(ONBOARDING_QUESTIONS.map((question) => [question.key, question]));
 const AI_ONBOARDING_PROMPT_MARKER = "ONBOARDING_DYNAMIC_JSON";
+const AI_ONBOARDING_TIMEOUT_MS = 120000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -210,6 +211,9 @@ export async function planAiOnboardingQuestion(
       temperature: 0.3,
       maxOutputTokens: 1200,
       maxRetries: 0,
+      timeout: {
+        totalMs: AI_ONBOARDING_TIMEOUT_MS,
+      },
     });
     const parsed = extractJsonObject(result.text);
     const nextQuestion = coerceAiOnboardingQuestionResult(parsed, new Set(remainingKeys));
