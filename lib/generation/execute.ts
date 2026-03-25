@@ -252,6 +252,7 @@ export async function executeGeneration(input: GenerationExecutionInput): Promis
       prompt: input.prompt,
       temperature: input.temperature,
       maxOutputTokens: input.maxOutputTokens,
+      maxRetries: 0,
       timeout: {
         totalMs: GENERATION_REQUEST_TIMEOUT_MS,
       },

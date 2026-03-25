@@ -316,7 +316,7 @@ export function getRunFailureHint(errorSummary: string | null | undefined, error
     normalized.includes("timed out") ||
     normalized.includes("gateway timeout")
   ) {
-    return "当前是上游网关超时。平台已适度放宽等待时间，但如果上游服务本身超时，仍建议先减少 MCP / 外部事实 / 上下文体量，或检查上游代理超时配置后再重试。";
+    return "当前是上游网关超时。平台已适度放宽等待时间，但如果你使用的是第三方 OpenAI 兼容网关，且接口模式为 Responses API，建议先切到 Chat Completions API；同时减少 MCP / 外部事实 / 上下文体量，或检查上游代理超时配置后再重试。";
   }
 
   if (code === "MODEL_UNAVAILABLE" || normalized.includes("model")) {

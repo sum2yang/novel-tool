@@ -31,7 +31,7 @@
 - OpenAI `Responses API` 在任务执行与 AI 引导创建里支持流式返回
 - 远程 MCP 接入
 - 用户级 Grok / Tavily / Firecrawl 配置
-- 设置页支持删除未绑定历史生成记录的模型接口与远程 MCP 服务
+- 设置页支持移除模型接口与远程 MCP 服务；若模型接口已被历史运行引用，则自动归档并从可用列表隐藏
 - 导出中心与服务端归档
 - Docker 本地联调
 - GitHub Actions + GHCR + 远端 Docker Compose 部署
@@ -169,7 +169,7 @@ cp .env.docker.example .env.docker
 - 本地 Compose 环境里 `DATABASE_URL` 默认应保持连接容器内主机名 `postgres`
 - `APP_IMAGE` 本地开发时通常留空
 - 如果你通过域名或反向代理访问站点，`BETTER_AUTH_URL` 和 `APP_BASE_URL` 必须改成实际对外访问地址；否则 Better Auth 会报 `Invalid origin`，导致注册、登录和退出登录失败
-- 如果某个 OpenAI 兼容上游只实现了 `/v1/chat/completions`，请在设置页把该端点的 API 模式切到 `Chat Completions API`
+- 如果某个 OpenAI 兼容上游只实现了 `/v1/chat/completions`，或它对 `/v1/responses` 容易返回 `Gateway Timeout`，请在设置页把该端点的 API 模式切到 `Chat Completions API`
 - 当用户没有填写个人 Grok / Tavily / Firecrawl 配置时，应用会按这 7 个字段逐项回退到平台默认
 - 如果同时填写 `LINUX_DO_CLIENT_ID` 和 `LINUX_DO_CLIENT_SECRET`，登录页和注册页会自动显示 `Linux DO` 登录 / 注册按钮
 
